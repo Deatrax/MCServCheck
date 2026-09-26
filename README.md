@@ -1,70 +1,72 @@
 # Minecraft Status Bot (Discord · Vercel · MongoDB Atlas)
 
-Slash-command bot using Discord HTTP interactions, so it runs entirely as one serverless function. No always-on process.
+Slash commands, a web dashboard with Discord sign-in, and automatic online/offline alerts. Everything runs as serverless functions on Vercel's free plan.
 
-## Commands
+## Features
 
-| Command | Who | What |
-|---|---|---|
-| `/status` | everyone | Ping every tracked server |
-| `/status name:<name>` | everyone | Ping one server (autocompletes) |
-| `/server add name:<n> address:<host[:port]> [edition]` | Manage Server | Track a server (pings it once to confirm) |
-| `/server remove name:<n>` | Manage Server | Stop tracking (autocompletes) |
-| `/server list` | Manage Server | Show tracked servers without pinging |
+| Where | What |
+|---|---|
+| `/status [name]` | Ping all servers, or one (autocompletes). Anyone can use it. |
+| `/server add \| remove \| list` | Manage tracked servers (Manage Server permission). |
+| `/server alerts [channel]` | Post alerts in a channel when a server comes online or goes offline. Empty turns alerts off. |
+| Dashboard (`/`) | Same management in the browser, for users with Manage Server in that Discord server. |
+| `/api/poll` | Called every 5 min by a scheduler. Detects changes and posts alerts. |
 
-Servers are stored per Discord guild, max 25 each. States: 🟢 online, 🟡 sleeping (host proxy answered with a placeholder, e.g. Aternos asleep/starting), 🔴 offline/unreachable.
+States: 🟢 online, 🟡 asleep or starting (e.g. Aternos placeholder), 🔴 offline. "Down" needs 2 failed checks in a row, so one dropped ping doesn't alert. "Up" alerts on the first success.
 
-Tip: for Aternos, add the address **without** a port (e.g. `myserver.aternos.me`). The bot then follows the SRV record, which always points at the current port.
+## Environment variables (all on Vercel unless noted)
 
-## Environment variables
+| Variable | Where to get it |
+|---|---|
+| `DISCORD_APPLICATION_ID` | Developer Portal → General Information |
+| `DISCORD_PUBLIC_KEY` | Developer Portal → General Information |
+| `DISCORD_CLIENT_SECRET` | Developer Portal → OAuth2 → Client Secret (Reset) |
+| `DISCORD_BOT_TOKEN` | Developer Portal → Bot → Reset Token. Needed on Vercel for alerts and the dashboard's channel list. |
+| `MONGODB_URI` | Atlas → Connect → Drivers (Network Access must allow `0.0.0.0/0`) |
+| `MONGODB_DB` | Optional, default `mcstatus` |
+| `APP_URL` | Your production URL, e.g. `https://mc-serv-check.vercel.app` (no trailing slash) |
+| `CRON_SECRET` | Any long random string: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
+| `DISCORD_GUILD_ID` | Local only, optional: register commands to one guild for instant updates |
 
-| Variable | Where it's used | Where to get it |
-|---|---|---|
-| `DISCORD_APPLICATION_ID` | local + Vercel | Developer Portal → app → General Information → Application ID |
-| `DISCORD_PUBLIC_KEY` | Vercel | Same page → Public Key |
-| `DISCORD_BOT_TOKEN` | **local only** | App → Bot → Reset Token |
-| `DISCORD_GUILD_ID` | local, optional | Discord → Settings → Advanced → Developer Mode, then right-click your server → Copy Server ID |
-| `MONGODB_URI` | Vercel | Atlas → Connect → Drivers |
-| `MONGODB_DB` | Vercel, optional | Any name; default `mcstatus` |
+Redeploy after changing env vars.
 
 ## Setup
 
-1. **Discord app**: https://discord.com/developers/applications → New Application. Copy Application ID and Public Key. On the Bot tab, reset and copy the token.
-2. **MongoDB Atlas**: create a free M0 cluster. Database Access → add a user with read/write. Network Access → allow `0.0.0.0/0` (Vercel has no fixed IPs). Connect → Drivers → copy the URI and fill in the password.
-3. **Register commands** (locally, Node ≥ 20.19):
-   ```bash
-   cp .env.example .env   # fill it in
-   npm install
-   npm run register
-   ```
-   Set `DISCORD_GUILD_ID` while testing so updates appear instantly; clear it and re-run to go global.
-4. **Deploy**: push to GitHub, import the repo in Vercel, add `DISCORD_APPLICATION_ID`, `DISCORD_PUBLIC_KEY`, `MONGODB_URI` (and optionally `MONGODB_DB`) under Environment Variables, deploy. Opening `https://<project>.vercel.app/api/interactions` in a browser should say it's running.
-5. **Connect Discord**: Developer Portal → General Information → Interactions Endpoint URL = `https://<project>.vercel.app/api/interactions` → Save. Discord sends a signed test ping; if it saves, verification works.
-6. **Invite**: open
-   `https://discord.com/oauth2/authorize?client_id=<APPLICATION_ID>&scope=applications.commands+bot&permissions=0`
-   (`bot` is only so it shows in the member list; `applications.commands` alone is enough.)
-
-If you change env vars in Vercel, redeploy for them to take effect. If you change `lib/commands.js`, re-run `npm run register`.
+1. **Env vars:** add the ones above in Vercel and redeploy.
+2. **OAuth redirect:** Developer Portal → OAuth2 → Redirects → add `https://<your-domain>/api/auth/callback`. It must match `APP_URL` exactly.
+3. **Commands:** run `npm run register` locally (adds `/server alerts`).
+4. **Bot permissions:** the bot needs View Channel, Send Messages and Embed Links in the alerts channel. Re-invite with
+   `https://discord.com/oauth2/authorize?client_id=<APP_ID>&scope=bot+applications.commands&permissions=19456`
+   or grant those in the channel settings. `/server alerts` posts a test message and tells you if something's missing.
+5. **Scheduler:** at https://cron-job.org create a job:
+   - URL: `https://<your-domain>/api/poll`
+   - Schedule: every 5 minutes
+   - Advanced → Headers: `Authorization: Bearer <CRON_SECRET>`
+   - (If you can't set headers, use `https://<your-domain>/api/poll?key=<CRON_SECRET>` instead.)
+   - Hit "Test run". You should get `{"ok":true,"checked":N,...}`.
+6. **Interactions endpoint:** unchanged, `https://<your-domain>/api/interactions`.
 
 ## Testing locally
 
-Ping servers from your machine with the bot's own code (no Discord or MongoDB needed):
-
 ```bash
-npm run check -- Animos900.aternos.me
-npm run check -- host1 host2:25566
-npm run check -- bedrock.example.com --bedrock
+npm run check -- Animos900.aternos.me        # ping with the bot's own code
+npx vercel dev                               # full app on localhost:3000
 ```
-
-To run the full bot locally: `npx vercel dev` (serves on `localhost:3000`), expose it with a tunnel such as `cloudflared tunnel --url http://localhost:3000`, and temporarily set the Interactions Endpoint URL to `<tunnel-url>/api/interactions`. Don't add a `dev` script that calls `vercel dev`; Vercel refuses to invoke itself recursively.
+For Discord to reach `vercel dev`, expose it with `cloudflared tunnel --url http://localhost:3000` and temporarily point the Interactions URL and OAuth redirect at the tunnel. Don't add a `dev` script that calls `vercel dev`; Vercel refuses to invoke itself recursively.
 
 ## Layout
 
 ```
-api/interactions.js       Vercel function: signature check, routing, deferred replies
-lib/commands.js           Slash command definitions
-lib/db.js                 MongoDB access (cached connection)
-lib/mc.js                 Address parsing + Java/Bedrock pings
-lib/discord.js            Embeds and reply editing
-scripts/register-commands.js
+api/interactions.js     Discord slash commands (signature check, deferred replies)
+api/poll.js             Scheduled check + alerts (CRON_SECRET protected)
+api/dashboard.js        JSON API for the dashboard (?op=me|servers|check|channels|alerts)
+api/auth/*.js           Discord OAuth: login, callback, logout
+lib/service.js          Add/remove/alerts logic shared by bot and dashboard
+lib/monitor.js          Up/down state machine and alert posting
+lib/auth.js             Sessions (MongoDB, 7 days), cookies, CSRF checks
+lib/db.js  lib/mc.js  lib/discord.js  lib/commands.js
+public/index.html       Dashboard
+scripts/check.js  scripts/register-commands.js
 ```
+
+Security notes: sessions are random IDs in an HttpOnly, Secure, SameSite=Lax cookie. Writes require a JSON body and a same-origin `Origin`. Guild permissions are re-checked against Discord every 5 minutes.

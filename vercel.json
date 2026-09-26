@@ -1,8 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "public",
   "functions": {
-    "api/interactions.js": {
-      "maxDuration": 30
-    }
+    "api/interactions.js": { "maxDuration": 30 },
+    "api/dashboard.js": { "maxDuration": 30 },
+    "api/poll.js": { "maxDuration": 60 }
   }
 }

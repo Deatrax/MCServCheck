@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Server lamps</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect x='1' y='1' width='14' height='14' rx='2' fill='%23FFB84D'/><path d='M1 8h14M8 1v14' stroke='%23B8692A' stroke-width='1.5'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Mono:wght@400;500&family=Atkinson+Hyperlegible+Next:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --deepslate: #2a2d33;
+    --raised: #33373e;
+    --seam: #464b54;
+    --stone: #9da2ab;
+    --chalk: #ece8e1;
+    --glow: #ffb84d;
+    --ember: #b8692a;
+    --redstone: #e0584c;
+    --font: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "Atkinson Hyperlegible Mono", ui-monospace, "SF Mono", Consolas, monospace;
+    color-scheme: dark;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  body {
+    margin: 0;
+    background: var(--deepslate);
+    color: var(--chalk);
+    font: 400 1rem/1.5 var(--font);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--glow); }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--glow); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+
+  .wrap { max-width: 52rem; margin: 0 auto; padding: 1.25rem 1.25rem 4rem; }
+
+  /* ---------- lamp: the one memorable element ---------- */
+  .lamp {
+    --size: 2.75rem;
+    width: var(--size); height: var(--size); flex: none;
+    border-radius: 0.35rem;
+    border: 2px solid #1d1f23;
+    background:
+      linear-gradient(90deg, transparent 46%, #1d1f23 46% 54%, transparent 54%),
+      linear-gradient(0deg, transparent 46%, #1d1f23 46% 54%, transparent 54%),
+      #3b3f46;
+  }
+  .lamp[data-state="online"] {
+    background:
+      linear-gradient(90deg, transparent 46%, #c98a2c 46% 54%, transparent 54%),
+      linear-gradient(0deg, transparent 46%, #c98a2c 46% 54%, transparent 54%),
+      radial-gradient(circle at 50% 50%, #fff1c9 0 18%, var(--glow) 55%, #e09a33 100%);
+    border-color: #6b4515;
+    box-shadow: 0 0 1.4rem rgba(255, 184, 77, 0.45), 0 0 0.35rem rgba(255, 184, 77, 0.8);
+  }
+  .lamp[data-state="sleeping"] {
+    background:
+      linear-gradient(90deg, transparent 46%, #4a2c12 46% 54%, transparent 54%),
+      linear-gradient(0deg, transparent 46%, #4a2c12 46% 54%, transparent 54%),
+      radial-gradient(circle at 50% 50%, #d58a45 0 12%, var(--ember) 45%, #5c3413 100%);
+    border-color: #3d240e;
+    box-shadow: 0 0 0.6rem rgba(184, 105, 42, 0.35);
+  }
+  .lamp[data-state="unknown"] { background: transparent; border: 2px dashed var(--seam); }
+  .lamp.big { --size: 4.5rem; border-width: 3px; }
+  .lamp.small { --size: 1.25rem; border-width: 1.5px; border-radius: 0.2rem; }
+
+  @keyframes flicker {
+    0% { filter: brightness(0.3); } 18% { filter: brightness(1.25); } 30% { filter: brightness(0.5); }
+    45% { filter: brightness(1.1); } 60% { filter: brightness(0.8); } 100% { filter: brightness(1); }
+  }
+  .lamp.flicker { animation: flicker 0.6s steps(1, end) both; }
+  @media (prefers-reduced-motion: reduce) { .lamp.flicker { animation: none; } }
+
+  /* ---------- top bar ---------- */
+  .bar {
+    display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
+    padding-bottom: 1rem; border-bottom: 1px solid var(--seam);
+  }
+  .brand { display: flex; align-items: center; gap: 0.6rem; font-weight: 800; font-size: 1.1rem; margin-right: auto; }
+  .who { display: flex; align-items: center; gap: 0.6rem; color: var(--stone); }
+  .avatar { width: 2rem; height: 2rem; border-radius: 50%; background: var(--raised); }
+  select, input {
+    background: var(--raised); border: 1px solid var(--seam); border-radius: 0.4rem;
+    padding: 0.55rem 0.7rem; min-height: 2.75rem; max-width: 100%;
+  }
+  input::placeholder { color: #7d828b; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    min-height: 2.75rem; padding: 0.55rem 1rem; border-radius: 0.4rem; cursor: pointer;
+    border: 1px solid var(--seam); background: var(--raised); font-weight: 600; text-decoration: none; color: var(--chalk);
+  }
+  .btn.primary { background: var(--glow); border-color: var(--glow); color: #2a1a05; }
+  .btn.quiet { background: none; border-color: transparent; color: var(--stone); padding-inline: 0.5rem; }
+  .btn.quiet:hover { color: var(--chalk); }
+  .btn.danger:hover { color: var(--redstone); }
+  .btn[disabled] { opacity: 0.55; cursor: progress; }
+
+  /* ---------- sign-in ---------- */
+  .signin { min-height: 80vh; display: grid; align-content: center; gap: 1.25rem; max-width: 30rem; }
+  .signin h1 { font-size: clamp(2.2rem, 7vw, 3.2rem); line-height: 1.05; margin: 0; font-weight: 800; letter-spacing: -0.02em; }
+  .signin p { margin: 0; color: var(--stone); font-size: 1.1rem; }
+
+  /* ---------- sections ---------- */
+  section { margin-top: 2.25rem; }
+  .head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  h2 { font-size: 1.6rem; line-height: 1.2; margin: 0; font-weight: 800; letter-spacing: -0.01em; }
+  h3 { font-size: 1.1rem; margin: 0 0 0.35rem; font-weight: 800; }
+  .sub { color: var(--stone); margin: 0.25rem 0 0; }
+
+  .servers { list-style: none; margin: 1.25rem 0 0; padding: 0; border-top: 1px solid var(--seam); }
+  .server {
+    display: grid; grid-template-columns: auto 1fr auto; gap: 0.35rem 1rem; align-items: center;
+    padding: 1rem 0; border-bottom: 1px solid var(--seam);
+  }
+  .server .name { font-weight: 800; font-size: 1.2rem; line-height: 1.2; overflow-wrap: anywhere; }
+  .server .addr { font-family: var(--mono); font-size: 0.9rem; color: var(--stone); overflow-wrap: anywhere; }
+  .server .detail { grid-column: 2 / 4; color: var(--stone); font-size: 0.95rem; }
+  .server .detail strong { color: var(--chalk); font-weight: 600; }
+  .server[data-state="online"] .detail strong { color: var(--glow); }
+  .server[data-state="offline"] .detail strong { color: var(--redstone); }
+  .server .lamp { grid-column: 1; grid-row: 1 / 3; align-self: start; }
+  .server .ident { grid-column: 2; grid-row: 1; min-width: 0; }
+  .server .actions { grid-column: 3; grid-row: 1; }
+  .server .detail { grid-row: 2; }
+  @media (min-width: 40rem) { .server .detail { grid-column: 2; } .server .actions { grid-row: 1 / 3; } }
+
+  .empty { padding: 1.5rem 0; color: var(--stone); border-bottom: 1px solid var(--seam); }
+
+  form.add { display: grid; gap: 0.6rem; grid-template-columns: 1fr; margin-top: 0.75rem; }
+  @media (min-width: 40rem) { form.add { grid-template-columns: 10rem 1fr 8rem auto; } }
+  label.field { display: grid; gap: 0.25rem; font-size: 0.9rem; color: var(--stone); }
+  label.field input, label.field select { width: 100%; min-width: 0; color: var(--chalk); }
+  .hint { font-size: 0.9rem; color: var(--stone); margin: 0.5rem 0 0; }
+
+  .alerts { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: end; margin-top: 0.75rem; }
+  .alerts label.field { flex: 1 1 14rem; }
+
+  .msg { margin: 0.6rem 0 0; font-size: 0.95rem; }
+  .msg.error { color: var(--redstone); }
+  .msg.ok { color: var(--glow); }
+
+  .notice {
+    margin-top: 2rem; padding: 1.25rem; border: 1px solid var(--seam); border-radius: 0.5rem;
+    display: grid; gap: 0.75rem; justify-items: start; background: var(--raised);
+  }
+  .notice p { margin: 0; color: var(--stone); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Sign-in -->
+  <main id="signin" class="signin" hidden>
+    <div class="lamp big" data-state="online" aria-hidden="true"></div>
+    <h1>See which Minecraft servers are up.</h1>
+    <p>Sign in with the Discord account you use to manage your server. You'll see every Discord server where you have Manage Server permission.</p>
+    <p id="signin-error" class="msg error" hidden></p>
+    <div><a class="btn primary" href="/api/auth/login">Sign in with Discord</a></div>
+  </main>
+
+  <!-- Dashboard -->
+  <div id="app" hidden>
+    <header class="bar">
+      <div class="brand"><span class="lamp small" data-state="online" aria-hidden="true"></span>Server lamps</div>
+      <select id="guild" aria-label="Discord server"></select>
+      <div class="who">
+        <img id="avatar" class="avatar" alt="">
+        <span id="username"></span>
+        <button id="signout" class="btn quiet" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <div id="no-guilds" class="notice" hidden>
+      <h3>No Discord servers to manage</h3>
+      <p>You need Manage Server permission in a Discord server to set up status checks there.</p>
+    </div>
+
+    <div id="invite" class="notice" hidden>
+      <h3>Add the bot to this Discord server first</h3>
+      <p>The bot needs to be in the server to post alerts and answer <code>/status</code>.</p>
+      <a id="invite-link" class="btn primary" target="_blank" rel="noopener">Add the bot</a>
+      <button id="invite-done" class="btn quiet" type="button">I've added it, reload</button>
+    </div>
+
+    <div id="guild-view" hidden>
+      <section>
+        <div class="head">
+          <div>
+            <h2 id="guild-title">Servers</h2>
+            <p id="last-poll" class="sub"></p>
+          </div>
+          <button id="check" class="btn" type="button">Check now</button>
+        </div>
+        <ul id="servers" class="servers"></ul>
+      </section>
+
+      <section>
+        <h3>Add a server</h3>
+        <form id="add" class="add" autocomplete="off">
+          <label class="field">Name
+            <input name="name" required maxlength="32" pattern="[A-Za-z0-9_\-]{1,32}" placeholder="survival">
+          </label>
+          <label class="field">Address
+            <input name="address" required maxlength="255" placeholder="myserver.aternos.me" spellcheck="false" autocapitalize="off">
+          </label>
+          <label class="field">Edition
+            <select name="edition"><option value="java">Java</option><option value="bedrock">Bedrock</option></select>
+          </label>
+          <button class="btn primary" type="submit" style="align-self:end">Add server</button>
+        </form>
+        <p class="hint">For Aternos, leave the port off. The address alone always finds the current port.</p>
+        <p id="add-msg" class="msg" hidden></p>
+      </section>
+
+      <section>
+        <h3>Alerts</h3>
+        <p class="sub">Post a message when a server comes online or goes offline. Servers are checked every few minutes.</p>
+        <div class="alerts">
+          <label class="field">Channel
+            <select id="alerts-channel"><option value="">Off</option></select>
+          </label>
+          <button id="alerts-save" class="btn primary" type="button">Save alerts</button>
+        </div>
+        <p id="alerts-msg" class="msg" hidden></p>
+      </section>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const state = { me: null, guildId: null, servers: [], channelsLoaded: null };
+
+  // --- tiny DOM helper: text only, never innerHTML with user data ---
+  function el(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (v == null || v === false) continue;
+      if (k === 'class') node.className = v;
+      else if (k === 'dataset') Object.assign(node.dataset, v);
+      else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v === true ? '' : v);
+    }
+    for (const c of children.flat()) if (c != null && c !== false) node.append(c.nodeType ? c : String(c));
+    return node;
+  }
+
+  function showMsg(node, text, kind) {
+    node.textContent = text;
+    node.className = `msg ${kind}`;
+    node.hidden = !text;
+  }
+
+  async function api(op, { method = 'GET', guild, params = {}, body } = {}) {
+    const q = new URLSearchParams({ op, ...(guild && { guild }), ...params });
+    const res = await fetch(`/api/dashboard?${q}`, {
+      method,
+      headers: body !== undefined ? { 'Content-Type': 'application/json' } : {},
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      credentials: 'same-origin',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401) { showSignin(); throw new Error(data.error || 'Signed out'); }
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    return data;
+  }
+
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  };
+
+  function ago(date) {
+    if (!date) return null;
+    const s = Math.max(0, (Date.now() - new Date(date)) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.round(s / 60)} min ago`;
+    if (s < 172800) return `${Math.round(s / 3600)} h ago`;
+    return `${Math.round(s / 86400)} days ago`;
+  }
+
+  const LABEL = { online: 'Online', sleeping: 'Asleep or starting', offline: 'Offline', unknown: 'Not checked yet' };
+
+  // ---------- views ----------
+  function showSignin() {
+    $('app').hidden = true;
+    $('signin').hidden = false;
+    const err = new URLSearchParams(location.search).get('error');
+    if (err) showMsg($('signin-error'), err, 'error');
+  }
+
+  async function boot() {
+    try {
+      state.me = await api('me');
+    } catch { return; }
+    history.replaceState(null, '', '/');
+    $('signin').hidden = true;
+    $('app').hidden = false;
+
+    const u = state.me.user;
+    $('username').textContent = u.name;
+    $('avatar').src = u.avatar
+      ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=64`
+      : 'https://cdn.discordapp.com/embed/avatars/0.png';
+
+    const guilds = [...state.me.guilds].sort((a, b) => (b.botPresent - a.botPresent) || a.name.localeCompare(b.name));
+    const select = $('guild');
+    select.replaceChildren(...guilds.map((g) => el('option', { value: g.id }, g.botPresent ? g.name : `${g.name} (bot not added)`)));
+    select.hidden = guilds.length === 0;
+    $('no-guilds').hidden = guilds.length > 0;
+    if (!guilds.length) return;
+
+    const saved = store.get('guild');
+    select.value = guilds.some((g) => g.id === saved) ? saved : guilds[0].id;
+    selectGuild(select.value);
+  }
+
+  async function selectGuild(id) {
+    state.guildId = id;
+    state.channelsLoaded = null;
+    store.set('guild', id);
+    const g = state.me.guilds.find((x) => x.id === id);
+
+    $('invite').hidden = g.botPresent;
+    $('guild-view').hidden = !g.botPresent;
+    if (!g.botPresent) {
+      const p = new URLSearchParams({
+        client_id: state.me.applicationId,
+        scope: 'bot applications.commands',
+        permissions: state.me.invitePermissions,
+        guild_id: id,
+        disable_guild_select: 'true',
+      });
+      $('invite-link').href = `https://discord.com/oauth2/authorize?${p}`;
+      return;
+    }
+
+    $('guild-title').textContent = `Servers in ${g.name}`;
+    showMsg($('add-msg'), '', 'ok');
+    showMsg($('alerts-msg'), '', 'ok');
+    $('servers').replaceChildren(el('li', { class: 'empty' }, 'Loading…'));
+
+    try {
+      const data = await api('servers', { guild: id });
+      if (state.guildId !== id) return;
+      state.servers = data.servers;
+      renderServers();
+      loadChannels(data.alertsChannelId);
+    } catch (e) {
+      $('servers').replaceChildren(el('li', { class: 'empty' }, e.message));
+    }
+  }
+
+  function stateOf(s) { return s.live?.state ?? s.status?.state ?? 'unknown'; }
+
+  function renderServers(flicker = false) {
+    const list = $('servers');
+    if (!state.servers.length) {
+      list.replaceChildren(el('li', { class: 'empty' }, 'No servers yet. Add one below, or use /server add in Discord.'));
+      $('last-poll').textContent = '';
+      return;
+    }
+
+    const lastPoll = state.servers.map((s) => s.status?.checkedAt).filter(Boolean).sort().pop();
+    $('last-poll').textContent = lastPoll
+      ? `Last automatic check ${ago(lastPoll)}.`
+      : "Automatic checks haven't run yet. Set up the scheduler from the README to get alerts.";
+
+    list.replaceChildren(...state.servers.map((s, i) => {
+      const st = stateOf(s);
+      const info = s.live ?? s.status ?? {};
+      const bits = [el('strong', {}, LABEL[st])];
+      if (st === 'online' && info.players) bits.push(` with ${info.players.online}/${info.players.max} players`);
+      if (st === 'online' && info.version) bits.push(` on ${info.version}`);
+      if (st === 'offline' && info.error) bits.push(`: ${info.error}`);
+      const when = s.live ? 'just now' : ago(s.status?.checkedAt);
+      if (when) bits.push(`. Checked ${when}.`);
+
+      const lamp = el('div', { class: `lamp${flicker ? ' flicker' : ''}`, dataset: { state: st }, 'aria-hidden': 'true' });
+      if (flicker) lamp.style.animationDelay = `${i * 90}ms`;
+
+      return el('li', { class: 'server', dataset: { state: st } },
+        lamp,
+        el('div', { class: 'ident' }, el('div', { class: 'name' }, s.name), el('div', { class: 'addr' }, s.address)),
+        el('div', { class: 'actions' },
+          el('button', { class: 'btn quiet danger', type: 'button', 'aria-label': `Remove ${s.name}`, onclick: () => removeServer(s.name) }, 'Remove')),
+        el('div', { class: 'detail' }, bits),
+      );
+    }));
+  }
+
+  async function checkNow() {
+    const btn = $('check');
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    try {
+      const { results } = await api('check', { method: 'POST', guild: state.guildId, body: {} });
+      const byName = new Map(results.map((r) => [r.name, r]));
+      state.servers = state.servers.map((s) => ({ ...s, live: byName.get(s.name) ?? s.live }));
+      renderServers(true);
+    } catch (e) {
+      alert(e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Check now';
+    }
+  }
+
+  async function removeServer(name) {
+    if (!confirm(`Stop tracking "${name}"?`)) return;
+    try {
+      await api('servers', { method: 'DELETE', guild: state.guildId, params: { name } });
+      state.servers = state.servers.filter((s) => s.name !== name);
+      renderServers();
+      showMsg($('add-msg'), `Removed ${name}.`, 'ok');
+    } catch (e) {
+      showMsg($('add-msg'), e.message, 'error');
+    }
+  }
+
+  async function addServer(ev) {
+    ev.preventDefault();
+    const form = ev.currentTarget;
+    const btn = form.querySelector('button');
+    const body = Object.fromEntries(new FormData(form));
+    btn.disabled = true;
+    btn.textContent = 'Adding…';
+    try {
+      const { server, result } = await api('servers', { method: 'POST', guild: state.guildId, body });
+      state.servers = [...state.servers, { ...server, live: result }].sort((a, b) => a.name.localeCompare(b.name));
+      renderServers();
+      form.reset();
+      showMsg($('add-msg'), `Added ${server.name}. It's ${LABEL[result.state].toLowerCase()} right now.`, 'ok');
+    } catch (e) {
+      showMsg($('add-msg'), e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Add server';
+    }
+  }
+
+  async function loadChannels(current) {
+    const select = $('alerts-channel');
+    try {
+      const { channels } = await api('channels', { guild: state.guildId });
+      select.replaceChildren(el('option', { value: '' }, 'Off'), ...channels.map((c) => el('option', { value: c.id }, `#${c.name}`)));
+      select.value = current ?? '';
+      state.channelsLoaded = true;
+    } catch (e) {
+      showMsg($('alerts-msg'), e.message, 'error');
+    }
+  }
+
+  async function saveAlerts() {
+    const btn = $('alerts-save');
+    const channelId = $('alerts-channel').value || null;
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      await api('alerts', { method: 'PUT', guild: state.guildId, body: { channelId } });
+      const name = $('alerts-channel').selectedOptions[0]?.textContent;
+      showMsg($('alerts-msg'), channelId ? `Alerts saved. A test message was posted in ${name}.` : 'Alerts turned off.', 'ok');
+    } catch (e) {
+      showMsg($('alerts-msg'), e.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Save alerts';
+    }
+  }
+
+  $('guild').addEventListener('change', (e) => selectGuild(e.target.value));
+  $('check').addEventListener('click', checkNow);
+  $('add').addEventListener('submit', addServer);
+  $('alerts-save').addEventListener('click', saveAlerts);
+  $('invite-done').addEventListener('click', () => location.reload());
+  $('signout').addEventListener('click', async () => {
+    await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => {});
+    location.href = '/';
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>

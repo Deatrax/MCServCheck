@@ -6,9 +6,10 @@ import {
 } from 'discord-interactions';
 import { waitUntil } from '@vercel/functions';
 
-import { listServers, findServer, addServer, removeServer, searchServerNames, MAX_SERVERS_PER_GUILD } from '../lib/db.js';
-import { pingServer, parseAddress, normalizeName, formatAddress } from '../lib/mc.js';
+import { listServers, findServer, searchServerNames, getGuildSettings } from '../lib/db.js';
+import { pingServer, pingMany, normalizeName, formatAddress } from '../lib/mc.js';
 import { readOptions, editOriginal, singleStatusEmbed, allStatusEmbed, listEmbed } from '../lib/discord.js';
+import { addServerFromInput, removeServerByName, setAlertsChannel } from '../lib/service.js';
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -105,7 +106,7 @@ async function handleStatus(interaction) {
 
   const servers = await listServers(guildId);
   if (!servers.length) return { content: 'No servers tracked yet. An admin can add one with `/server add`.' };
-  const results = await Promise.all(servers.map(pingServer));
+  const results = await pingMany(servers);
   return { embeds: [allStatusEmbed(servers, results)] };
 }
 
@@ -114,32 +115,33 @@ async function handleServer(interaction) {
   const { subcommand, values } = readOptions(interaction.data);
 
   if (subcommand === 'list') {
-    return { embeds: [listEmbed(await listServers(guildId))] };
+    const [servers, settings] = await Promise.all([listServers(guildId), getGuildSettings(guildId)]);
+    const embed = listEmbed(servers);
+    embed.footer = {
+      text: settings.alertsChannelId ? 'Alerts are on (see /server alerts)' : 'Alerts are off. Turn them on with /server alerts',
+    };
+    return { embeds: [embed] };
   }
 
   if (subcommand === 'remove') {
-    const name = normalizeName(values.name);
-    const removed = name && (await removeServer(guildId, name));
-    return { content: removed ? `🗑️ Removed **${name}**.` : `No server named **${String(values.name).slice(0, 32)}**.` };
+    const res = await removeServerByName(guildId, values.name);
+    return { content: res.ok ? `🗑️ Removed **${res.name}**.` : res.error };
   }
 
   if (subcommand === 'add') {
-    const name = normalizeName(values.name);
-    if (!name) return { content: 'Name must be 1–32 characters: letters, numbers, `_` or `-`.' };
+    const res = await addServerFromInput(guildId, values, interaction.member?.user?.id ?? null);
+    if (!res.ok) return { content: res.error };
+    return { content: `✅ Added **${res.server.name}**. Current status:`, embeds: [singleStatusEmbed(res.server, res.result)] };
+  }
 
-    const addr = parseAddress(values.address);
-    if (!addr) return { content: 'That address looks invalid. Use `host` or `host:port`.' };
-
-    const edition = values.edition === 'bedrock' ? 'bedrock' : 'java';
-    const server = { name, host: addr.host, port: addr.port, edition, addedBy: interaction.member?.user?.id ?? null };
-
-    const outcome = await addServer(guildId, server);
-    if (outcome === 'exists') return { content: `**${name}** already exists. Remove it first to change it.` };
-    if (outcome === 'limit') return { content: `This server already tracks the maximum of ${MAX_SERVERS_PER_GUILD}.` };
-
-    // Ping once so a typo in the address is obvious straight away.
-    const result = await pingServer(server);
-    return { content: `✅ Added **${name}**. Current status:`, embeds: [singleStatusEmbed(server, result)] };
+  if (subcommand === 'alerts') {
+    const res = await setAlertsChannel(guildId, values.channel ?? null);
+    if (!res.ok) return { content: `⚠️ ${res.error}` };
+    return {
+      content: res.channelId
+        ? `🔔 Alerts will be posted in <#${res.channelId}> when a server comes online or goes offline.`
+        : '🔕 Alerts are off.',
+    };
   }
 
   return { content: 'Unknown subcommand.' };
