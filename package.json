@@ -1,0 +1,20 @@
+{
+  "name": "mc-status-bot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Discord slash-command bot that checks Minecraft server status. Runs on Vercel with MongoDB Atlas.",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "check": "node scripts/check.js",
+    "register": "node --env-file=.env scripts/register-commands.js"
+  },
+  "dependencies": {
+    "@vercel/functions": "^3.9.9",
+    "discord-interactions": "^4.4.0",
+    "minecraft-server-util": "^5.4.4",
+    "mongodb": "^7.6.0"
+  }
+}

@@ -68,4 +68,3 @@ lib/mc.js                 Address parsing + Java/Bedrock pings
 lib/discord.js            Embeds and reply editing
 scripts/register-commands.js
 ```
-# MCServCheck
